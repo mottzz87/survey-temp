@@ -9,7 +9,7 @@
   },
   "admin": {
     "enabled": true,
-    "token": "CHANGE_ME_ADMIN_TOKEN"
+    "token": "583721"
   },
   "surveys": {
     "583721": {
@@ -46,9 +46,7 @@
             { "id": "tue", "label": "火曜日" },
             { "id": "wed", "label": "水曜日" },
             { "id": "thu", "label": "木曜日" },
-            { "id": "fri", "label": "金曜日" },
-            { "id": "sat", "label": "土曜日" },
-            { "id": "sun", "label": "日曜日" }
+            { "id": "fri", "label": "金曜日" }
           ]
         },
         {
