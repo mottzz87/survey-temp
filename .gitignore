@@ -3,3 +3,4 @@ data/*.tmp*
 *.log
 .DS_Store
 .claude
+.env
