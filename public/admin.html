@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>結果 | アンケート</title>
+<style>
+:root {
+  --bg: #f6f8f7;
+  --card: #ffffff;
+  --brand: #2f8f5b;
+  --text: #1f2d26;
+  --muted: #6b7a72;
+  --border: #e2e8e4;
+  --gold: #d9a514;
+  --silver: #9aa5a0;
+  --bronze: #c07a3f;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  -webkit-text-size-adjust: 100%;
+}
+.container { max-width: 640px; margin: 0 auto; padding: 24px 16px 64px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+h1 { font-size: 1.25rem; margin: 0 0 10px; line-height: 1.5; }
+h2 { font-size: 1.05rem; margin: 0 0 12px; }
+.meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 8px 0 14px; }
+.pill {
+  padding: 6px 14px;
+  background: #eaf5ee;
+  color: var(--brand);
+  border-radius: 999px;
+  font-weight: 700;
+}
+.updated { font-size: .82rem; color: var(--muted); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+  padding: 10px 16px;
+  font-size: .92rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.btn:hover { opacity: .9; }
+.btn.ghost { background: transparent; color: var(--brand); border: 1px solid var(--brand); }
+.bar-item { margin: 12px 0; }
+.bar-top { display: flex; justify-content: space-between; gap: 8px; font-size: .95rem; margin-bottom: 4px; }
+.bar-label { font-weight: 600; }
+.bar-num { color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar-track { background: #eef1ef; border-radius: 8px; height: 16px; overflow: hidden; }
+.bar-fill { background: var(--brand); height: 100%; border-radius: 8px; min-width: 2px; transition: width .3s; }
+.empty { color: var(--muted); text-align: center; padding: 24px 0; }
+.rank-head { font-size: .95rem; font-weight: 700; margin: 18px 0 6px; }
+.ranking { list-style: none; padding: 0; margin: 0; }
+.ranking li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  margin: 6px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.ranking .medal { font-weight: 700; }
+.ranking .cnt { color: var(--muted); font-variant-numeric: tabular-nums; }
+.gate { max-width: 420px; margin: 60px auto 0; text-align: center; }
+.gate input {
+  width: 100%;
+  padding: 13px 14px;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  outline: none;
+}
+.gate input:focus { border-color: var(--brand); }
+.gate .btn { width: 100%; }
+.gate .err { color: #c0392b; font-weight: 600; margin-top: 10px; }
+.popular {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: #fff8e6;
+  border: 1px solid #f0dfae;
+  border-radius: 10px;
+  font-weight: 700;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <main id="app">
+
+    <div class="card gate" id="gate" style="display:none">
+      <h1>🔒 管理者認証</h1>
+      <p style="color:var(--muted);font-size:.92rem">結果を表示するには管理者トークンが必要です。</p>
+      <input id="tokenInput" type="password" placeholder="管理者トークン" autocomplete="off">
+      <button class="btn" id="tokenBtn">ログイン</button>
+      <div class="err" id="authError"></div>
+    </div>
+
+    <div id="dashboard" style="display:none">
+      <div class="card">
+        <h1 id="title">…</h1>
+        <div class="meta">
+          <span class="pill">回答人数: <b id="total">0</b> 人</span>
+          <span class="updated" id="updated">—</span>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" id="refreshBtn">↻ 手動更新</button>
+          <button class="btn ghost" id="autoBtn">自動更新: ON</button>
+        </div>
+      </div>
+
+      <div id="qCards">
+        <div class="card"><div class="empty">データを読み込んでいます…</div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+"use strict";
+(function () {
+  var m = location.pathname.match(/\/survey\/api\/([^\/]+)\/result/);
+  var surveyId = m ? m[1] : '';
+  var LS_TOKEN_KEY = 'survey_admin_token';
+  var AUTO_INTERVAL = 30000;
+
+  var token = new URLSearchParams(location.search).get('token') || localStorage.getItem(LS_TOKEN_KEY) || '';
+  var autoOn = true;
+  var autoTimer = null;
+
+  var gate = document.getElementById('gate');
+  var dashboard = document.getElementById('dashboard');
+  var authError = document.getElementById('authError');
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function showGate(msg) {
+    dashboard.style.display = 'none';
+    gate.style.display = 'block';
+    authError.textContent = msg || '';
+    if (token) { document.getElementById('tokenInput').value = token; }
+    document.getElementById('tokenInput').focus();
+  }
+
+  function showError(msg) {
+    dashboard.style.display = 'none';
+    gate.style.display = 'block';
+    authError.textContent = msg || '';
+  }
+
+  async function fetchJson(path, authToken) {
+    var headers = { 'Accept': 'application/json' };
+    if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+    var r = await fetch(path, { headers: headers, cache: 'no-store' });
+    var data = null;
+    try { data = await r.json(); } catch (e) { data = null; }
+    return { status: r.status, data: data };
+  }
+
+  var medals = ['🥇', '🥈', '🥉'];
+
+  function barsHtml(q) {
+    if (!q.options || q.options.length === 0) return '<div class="empty">回答がありません。</div>';
+    return '<div>' + q.options.map(function (o) {
+      return '<div class="bar-item">' +
+        '<div class="bar-top"><span class="bar-label">' + esc(o.label) + '</span>' +
+        '<span class="bar-num">' + o.count + '人　' + o.percentage + '%</span></div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + Math.min(100, o.percentage) + '%"></div></div>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  function popularHtml(q) {
+    if (!q.mostPopular || q.mostPopular.count === 0) return '';
+    return '<div class="popular">🔥 最も人気: ' + esc(q.mostPopular.label) + '（' + q.mostPopular.count + '人）</div>';
+  }
+
+  function rankingHtml(q) {
+    if (!q.ranking || q.ranking.length === 0) return '';
+    var rows = q.ranking.map(function (o, i) {
+      var medal = medals[i] || (i + 1);
+      return '<li><span class="medal">' + medal + ' ' + esc(o.label) + '</span>' +
+        '<span class="cnt">' + o.count + '人</span></li>';
+    }).join('');
+    return '<div class="rank-head">🔥 人気ランキング</div><ol class="ranking">' + rows + '</ol>';
+  }
+
+  function render(data) {
+    document.title = data.title + ' | 結果';
+    document.getElementById('title').textContent = data.title;
+    document.getElementById('total').textContent = data.totalVoters;
+    document.getElementById('updated').textContent = '更新: ' + new Date(data.collectedAt).toLocaleString('ja-JP');
+
+    var qCards = document.getElementById('qCards');
+    qCards.innerHTML = '';
+    if (!data.questions || data.questions.length === 0) {
+      qCards.innerHTML = '<div class="card"><div class="empty">データがありません。</div></div>';
+      return;
+    }
+    data.questions.forEach(function (q) {
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = '<h2>📊 ' + esc(q.title || '質問') + '</h2>' + barsHtml(q) + popularHtml(q) + rankingHtml(q);
+      qCards.appendChild(card);
+    });
+  }
+
+  async function load() {
+    if (!surveyId) { showError('URLからアンケートIDを取得できませんでした。'); return; }
+    var path = '/survey/api/' + encodeURIComponent(surveyId) + '/result?format=json';
+    var res = await fetchJson(path, token);
+
+    if (res.status === 401) {
+      showGate(res.data && res.data.error === 'unauthorized' ? 'トークンが正しくありません。' : '管理者トークンが必要です。');
+      return;
+    }
+    if (res.status !== 200 || !res.data) {
+      showError('データの読み込みに失敗しました（' + res.status + '）。');
+      return;
+    }
+    if (token) localStorage.setItem(LS_TOKEN_KEY, token);
+    gate.style.display = 'none';
+    dashboard.style.display = 'block';
+    render(res.data);
+  }
+
+  function setAuto(on) {
+    autoOn = on;
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    if (autoOn) {
+      autoTimer = setInterval(load, AUTO_INTERVAL);
+      document.getElementById('autoBtn').textContent = '自動更新: ON';
+    } else {
+      document.getElementById('autoBtn').textContent = '自動更新: OFF';
+    }
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', load);
+  document.getElementById('autoBtn').addEventListener('click', function () { setAuto(!autoOn); });
+  document.getElementById('tokenBtn').addEventListener('click', function () {
+    token = document.getElementById('tokenInput').value.trim();
+    if (!token) { authError.textContent = 'トークンを入力してください。'; return; }
+    localStorage.setItem(LS_TOKEN_KEY, token);
+    authError.textContent = '';
+    load();
+  });
+  document.getElementById('tokenInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('tokenBtn').click();
+  });
+
+  if (!surveyId) { showError('URLからアンケートIDを取得できませんでした。'); }
+  else {
+    setAuto(true);
+    load();
+  }
+})();
+</script>
+</body>
+</html>

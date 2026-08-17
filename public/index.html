@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>アンケート</title>
+<style>
+:root {
+  --bg: #f6f8f7;
+  --card: #ffffff;
+  --brand: #2f8f5b;
+  --brand-dark: #256f49;
+  --text: #1f2d26;
+  --muted: #6b7a72;
+  --border: #e2e8e4;
+  --error: #c0392b;
+  --ok: #2f8f5b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.75;
+  -webkit-text-size-adjust: 100%;
+}
+.container { max-width: 560px; margin: 0 auto; padding: 24px 16px 64px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+h1 { font-size: 1.22rem; line-height: 1.5; margin: 0 0 12px; }
+h2 { font-size: 1.05rem; margin: 0 0 12px; }
+.desc { color: var(--muted); margin: 0 0 4px; }
+.pill {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 6px 16px;
+  background: #eaf5ee;
+  color: var(--brand);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: .92rem;
+}
+.qblock { margin: 10px 0 22px; }
+.qblock:last-child { margin-bottom: 4px; }
+.qtitle { font-size: 1.05rem; font-weight: 700; margin: 0 0 2px; }
+.qdesc { color: var(--muted); font-size: .9rem; margin: 2px 0 0; }
+.note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+  padding: 8px 12px;
+  background: #f4faf6;
+  border: 1px solid #d5ecdf;
+  border-radius: 10px;
+  font-size: .88rem;
+  color: var(--brand-dark);
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.option:hover { border-color: var(--brand); }
+.option:has(input:checked) {
+  border-color: var(--brand);
+  background: #f0faf4;
+}
+.option input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brand);
+  flex: none;
+}
+.opt-label { font-size: 1.05rem; font-weight: 600; }
+.field { margin: 16px 0 4px; }
+.field label { display: block; font-size: .95rem; font-weight: 600; margin-bottom: 6px; }
+.field input[type="text"] {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+}
+.field input[type="text"]:focus { border-color: var(--brand); }
+.btn {
+  display: block;
+  width: 100%;
+  padding: 15px;
+  margin-top: 20px;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--brand-dark); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.msg { margin-top: 14px; font-weight: 600; }
+.msg.error { color: var(--error); }
+.msg.ok { color: var(--ok); }
+.banner {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+.banner.warn { background: #fff6e0; color: #8a6d1a; border: 1px solid #f2e3b8; }
+.banner.error { background: #fdeeee; color: var(--error); border: 1px solid #f2cccc; }
+.readonly {
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: #fafbfa;
+  margin: 8px 0;
+  font-weight: 600;
+}
+.hint { font-size: .86rem; color: var(--muted); margin-top: 8px; }
+.bar-item { margin: 12px 0; }
+.bar-top { display: flex; justify-content: space-between; gap: 8px; font-size: .92rem; margin-bottom: 4px; }
+.bar-track { background: #eef1ef; border-radius: 8px; height: 14px; overflow: hidden; }
+.bar-fill { background: var(--brand); height: 100%; border-radius: 8px; min-width: 2px; transition: width .3s; }
+#loading { text-align: center; color: var(--muted); padding: 40px 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <main id="app">
+    <div class="card" id="loading">読み込み中…</div>
+  </main>
+</div>
+
+<script>
+"use strict";
+(function () {
+  const app = document.getElementById('app');
+  const pathMatch = location.pathname.match(/\/survey\/([^\/]+)/);
+  const surveyId = pathMatch ? pathMatch[1] : '';
+  const LS_KEY = 'survey_voter_id_' + surveyId;
+
+  let info = null;        // public payload from the server
+  let existing = null;    // { name, answers } previously submitted by this voter
+  let voterId = '';
+  let submitting = false;
+
+  function uuid() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      var v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fetchJson(path, opts) {
+    return fetch(path, opts || {})
+      .then(function (r) {
+        return r.json().then(function (d) { return { status: r.status, data: d }; })
+          .catch(function () { return { status: r.status, data: null }; });
+      });
+  }
+
+  function banner(cls, text) {
+    return '<div class="banner ' + cls + '">' + esc(text) + '</div>';
+  }
+
+  function renderError(text) {
+    app.innerHTML = '<div class="card">' + banner('error', text) + '</div>';
+  }
+
+  function renderClosed(text) {
+    app.innerHTML = '<div class="card">' + banner('warn', text) + '</div>';
+  }
+
+  function optionInput(type, name, id, checked) {
+    return '<input type="' + type + '" name="' + esc(name) + '" value="' + esc(id) + '"' +
+      (checked ? ' checked' : '') + '>';
+  }
+
+  // Render the selectable options of every question.
+  function questionsHtml(answersObj) {
+    var html = '';
+    info.questions.forEach(function (q) {
+      var type = q.allowMultiple ? 'checkbox' : 'radio';
+      var name = 'opt-' + q.id;
+      var checkedSet = {};
+      if (answersObj && Array.isArray(answersObj[q.id])) {
+        answersObj[q.id].forEach(function (a) { checkedSet[a] = true; });
+      }
+      html += '<div class="qblock">';
+      if (q.title) html += '<div class="qtitle">' + esc(q.title) + '</div>';
+      (q.description || []).forEach(function (line) {
+        html += '<p class="qdesc">' + esc(line) + '</p>';
+      });
+      if (q.allowMultiple) {
+        var selNote = '複数選択できます。';
+        if (q.maxSelections) selNote += '（最大 ' + q.maxSelections + ' つ）';
+        html += '<div class="note">' + esc(selNote) + '</div>';
+      }
+      q.options.forEach(function (o) {
+        html += '<label class="option">' + optionInput(type, name, o.id, !!checkedSet[o.id]) +
+                '<span class="opt-label">' + esc(o.label) + '</span></label>';
+      });
+      html += '</div>';
+    });
+    return html;
+  }
+
+  // Read-only summary of the voter's answers, per question.
+  function readOnlyHtml(answersObj) {
+    var html = '';
+    info.questions.forEach(function (q) {
+      var byId = {};
+      q.options.forEach(function (o) { byId[o.id] = o; });
+      var list = (answersObj && Array.isArray(answersObj[q.id])) ? answersObj[q.id] : [];
+      html += '<div class="qblock">';
+      if (q.title) html += '<div class="qtitle">' + esc(q.title) + '</div>';
+      if (list.length) {
+        list.forEach(function (id) {
+          html += '<div class="readonly">✓ ' + esc(byId[id] ? byId[id].label : id) + '</div>';
+        });
+      } else {
+        html += '<p class="hint">未回答</p>';
+      }
+      html += '</div>';
+    });
+    return html;
+  }
+
+  // Bars shown only when the survey opts in via showResultsToPublic.
+  function resultsHtml() {
+    var html = '';
+    info.questions.forEach(function (q) {
+      if (!Array.isArray(q.options) || !q.options[0] || typeof q.options[0].count !== 'number') return;
+      html += '<section class="card"><h2>' + esc(q.title || '結果') + '</h2>';
+      q.options.forEach(function (o) {
+        html += '<div class="bar-item">';
+        html += '<div class="bar-top"><span>' + esc(o.label) + '</span><span>' + o.count + '人　' + o.percentage + '%</span></div>';
+        html += '<div class="bar-track"><div class="bar-fill" style="width:' + Math.min(100, o.percentage) + '%"></div></div>';
+        html += '</div>';
+      });
+      html += '</section>';
+    });
+    return html;
+  }
+
+  function updateCount(n) {
+    var el = document.getElementById('totalCount');
+    if (el && n != null) el.textContent = n;
+  }
+
+  function renderPage() {
+    var locked = existing && info.allowRevote === false;
+    var html = '';
+
+    // Header card
+    html += '<header class="card">';
+    html += '<h1>' + esc(info.title) + '</h1>';
+    info.description.forEach(function (line) {
+      html += line ? '<p class="desc">' + esc(line) + '</p>' : '<p class="desc">&nbsp;</p>';
+    });
+    if (info.showTotalVoters) {
+      html += '<span class="pill">現在 <b id="totalCount">' + Number(info.totalVoters || 0) + '</b> 人が回答しています</span>';
+    }
+    html += '</header>';
+
+    // Optional public results cards (only when the survey opts in)
+    if (info.showResultsToPublic && Array.isArray(info.questions) && info.questions.length) {
+      html += resultsHtml();
+    }
+
+    // Form card
+    html += '<form class="card" id="surveyForm" novalidate>';
+
+    if (locked) {
+      html += '<div class="note">✓ 回答済み（変更はできません）</div>';
+      html += readOnlyHtml(existing.answers || {});
+      html += '<p class="hint">回答ありがとうございました。</p>';
+    } else {
+      html += questionsHtml(existing ? existing.answers : null);
+
+      if (info.collectName) {
+        var reqLabel = info.nameRequired ? '（必須）' : '（任意）';
+        html += '<div class="field">';
+        html += '<label for="nick">ニックネーム' + reqLabel + '</label>';
+        html += '<input id="nick" type="text" maxlength="50" autocomplete="nickname" value="' + esc(existing ? existing.name : '') + '">';
+        html += '</div>';
+      }
+
+      html += '<button type="submit" class="btn" id="submitBtn">回答する</button>';
+      html += '<div class="msg" id="formMsg" role="status"></div>';
+      if (existing && info.allowRevote !== false) {
+        html += '<p class="hint">回答済みです。選択を変更して再度送信できます。</p>';
+      }
+    }
+
+    html += '</form>';
+    app.innerHTML = html;
+
+    if (!locked) {
+      document.getElementById('surveyForm').addEventListener('submit', onSubmit);
+    }
+  }
+
+  function showMsg(text, isError) {
+    var el = document.getElementById('formMsg');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'msg ' + (isError ? 'error' : 'ok');
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    if (submitting) return;
+    var form = document.getElementById('surveyForm');
+
+    // Collect + validate answers per question.
+    var answers = {};
+    for (var i = 0; i < info.questions.length; i++) {
+      var q = info.questions[i];
+      var list = Array.prototype.map
+        .call(form.querySelectorAll('input[name="opt-' + q.id + '"]:checked'), function (el) { return el.value; });
+      answers[q.id] = list;
+      if (q.minSelections && list.length < q.minSelections) {
+        showMsg('「' + (q.title || '質問') + '」は ' + q.minSelections + ' つ以上選択してください。', true);
+        return;
+      }
+      var max = q.maxSelections || (q.allowMultiple ? q.options.length : 1);
+      if (list.length > max) {
+        showMsg('「' + (q.title || '質問') + '」は最大 ' + max + ' つまで選択できます。', true);
+        return;
+      }
+    }
+
+    var name = '';
+    if (info.collectName) {
+      name = form.querySelector('#nick').value.trim();
+      if (info.nameRequired && !name) { showMsg('ニックネームを入力してください。', true); return; }
+    }
+
+    submitting = true;
+    var btn = document.getElementById('submitBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '送信中…'; }
+
+    try {
+      var res = await fetchJson('/survey/api/' + encodeURIComponent(surveyId) + '/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voterId: voterId, name: name, answers: answers })
+      });
+
+      if (res.status === 200 && res.data && res.data.ok) {
+        existing = { name: name, answers: answers };
+        showMsg('✓ ' + (info.thankYouText || '回答ありがとうございます！'), false);
+        updateCount(res.data.totalVoters);
+        if (info.showResultsToPublic) { renderPage(); return; }
+        if (info.allowRevote === false) { renderPage(); return; }
+      } else {
+        showMsg((res.data && res.data.error) || '送信に失敗しました。時間をおいて再度お試しください。', true);
+      }
+    } catch (err) {
+      showMsg('通信エラーが発生しました。', true);
+    } finally {
+      submitting = false;
+      if (btn) { btn.disabled = false; btn.textContent = '回答する'; }
+    }
+  }
+
+  async function init() {
+    if (!surveyId) { renderError('URLからアンケートIDを取得できませんでした。'); return; }
+
+    voterId = localStorage.getItem(LS_KEY) || uuid();
+    localStorage.setItem(LS_KEY, voterId);
+
+    var res = await fetchJson('/survey/api/' + encodeURIComponent(surveyId) + '/public');
+    if (res.status !== 200 || !res.data || !res.data.surveyId) {
+      renderError('アンケートが見つかりませんでした。');
+      return;
+    }
+    info = res.data;
+
+    if (info.status === 'upcoming') { renderClosed('このアンケートはまだ開始されていません。'); return; }
+    if (info.status === 'ended') { renderClosed('このアンケートは終了しました。'); return; }
+
+    var mv = await fetchJson('/survey/api/' + encodeURIComponent(surveyId) + '/my-vote?voterId=' + encodeURIComponent(voterId));
+    if (mv.status === 200 && mv.data && mv.data.ok) existing = mv.data;
+
+    renderPage();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

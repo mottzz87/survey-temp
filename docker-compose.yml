@@ -1,0 +1,21 @@
+services:
+  ops-survey:
+    build: .
+    container_name: ops-survey
+    restart: unless-stopped
+    # Bind to 127.0.0.1 only: nginx on the host proxies to this port.
+    # The port is read from config.json (server.port). If you change it there,
+    # update the mapping below to match.
+    ports:
+      - "127.0.0.1:3010:3010"
+    volumes:
+      # Live votes + config on the host, so you can add surveys / edit config
+      # without rebuilding the image (config is re-read on mtime change).
+      - ./data:/app/data
+      - ./config.json:/app/config.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3010/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

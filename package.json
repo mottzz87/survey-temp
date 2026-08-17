@@ -1,0 +1,15 @@
+{
+  "name": "ops-survey",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lightweight, config-driven survey / voting system. Node.js native HTTP, JSON file storage, zero npm dependencies.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {},
+  "license": "MIT"
+}

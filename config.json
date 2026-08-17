@@ -1,0 +1,73 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 3010,
+    "maxBodyBytes": 16384,
+    "rateLimit": {
+      "votePerMinute": 20
+    }
+  },
+  "admin": {
+    "enabled": true,
+    "token": "CHANGE_ME_ADMIN_TOKEN"
+  },
+  "surveys": {
+    "583721": {
+      "enabled": true,
+      "title": "水辺｜平日午前、何時ならテニスできますか？",
+      "description": [
+        "平日の午前中は比較的時間があるので、",
+        "今後、水辺で練習会やイベントを開催する",
+        "時間の参考にしたいと思っています！",
+        "",
+        "「この時間なら行けそう！」という時間帯を",
+        "教えてください🙌",
+        "",
+        "複数の時間帯を選択OKです！"
+      ],
+      "collectName": true,
+      "allowAnonymous": true,
+      "requireName": false,
+      "showTotalVoters": true,
+      "showResultsToPublic": false,
+      "allowRevote": true,
+      "startAt": null,
+      "endAt": null,
+      "thankYouText": "回答ありがとうございます！回答はいつでも変更できます。",
+      "questions": [
+        {
+          "id": "weekday",
+          "title": "都合の良い曜日",
+          "allowMultiple": true,
+          "minSelections": 1,
+          "maxSelections": null,
+          "options": [
+            { "id": "mon", "label": "月曜日" },
+            { "id": "tue", "label": "火曜日" },
+            { "id": "wed", "label": "水曜日" },
+            { "id": "thu", "label": "木曜日" },
+            { "id": "fri", "label": "金曜日" },
+            { "id": "sat", "label": "土曜日" },
+            { "id": "sun", "label": "日曜日" }
+          ]
+        },
+        {
+          "id": "time",
+          "title": "都合の良い時間帯",
+          "allowMultiple": true,
+          "minSelections": 1,
+          "maxSelections": null,
+          "options": [
+            { "id": "06-07", "label": "06:00 ～ 07:00" },
+            { "id": "07-08", "label": "07:00 ～ 08:00" },
+            { "id": "08-09", "label": "08:00 ～ 09:00" },
+            { "id": "09-10", "label": "09:00 ～ 10:00" },
+            { "id": "10-11", "label": "10:00 ～ 11:00" },
+            { "id": "11-12", "label": "11:00 ～ 12:00" },
+            { "id": "12-13", "label": "12:00 ～ 13:00" }
+          ]
+        }
+      ]
+    }
+  }
+}
