@@ -1,7 +1,7 @@
 {
   "server": {
     "host": "127.0.0.1",
-    "port": 3010,
+    "port": 6533,
     "maxBodyBytes": 16384,
     "rateLimit": {
       "votePerMinute": 20

@@ -741,7 +741,7 @@ function warnIfDefaults() {
 
 const cfg = loadConfig();
 const serverCfg = cfg.server || {};
-const PORT = Number(process.env.PORT || serverCfg.port || 3010);
+const PORT = Number(process.env.PORT || serverCfg.port || 6533);
 const HOST = process.env.HOST || serverCfg.host || '127.0.0.1';
 
 warnIfDefaults();

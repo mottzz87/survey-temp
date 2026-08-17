@@ -38,13 +38,13 @@ node server.js
 npm start
 ```
 
-监听 `127.0.0.1:3010`（默认，可改 `config.json` 的 `server.port` / `server.host`）。
+监听 `127.0.0.1:6533`（默认，可改 `config.json` 的 `server.port` / `server.host`）。
 
 | 用途 | URL |
 | --- | --- |
-| 问卷列表 | http://127.0.0.1:3010/survey/ |
-| 问卷页面 | http://127.0.0.1:3010/survey/583721/ |
-| 管理员结果页 | http://127.0.0.1:3010/survey/api/583721/result |
+| 问卷列表 | http://127.0.0.1:6533/survey/ |
+| 问卷页面 | http://127.0.0.1:6533/survey/583721/ |
+| 管理员结果页 | http://127.0.0.1:6533/survey/api/583721/result |
 
 ---
 
@@ -71,7 +71,7 @@ GET   /survey/api/:surveyId/result      管理员结果页（HTML） / 结果 JS
 ```bash
 curl -s -H "Authorization: Bearer <TOKEN>" \
      -H "Accept: application/json" \
-     http://127.0.0.1:3010/survey/api/583721/result
+     http://127.0.0.1:6533/survey/api/583721/result
 ```
 
 结果 JSON 结构（每个问题一组统计）：
@@ -201,7 +201,7 @@ localStorage: survey_voter_id_583721
 {
   "server": {
     "host": "127.0.0.1",
-    "port": 3010,
+    "port": 6533,
     "maxBodyBytes": 16384,        // request body 上限
     "rateLimit": { "votePerMinute": 20 }   // 每 IP 每分钟最多 vote 次数
   },
@@ -312,7 +312,7 @@ cd /home/admin/apps/ops-survey
 docker compose up -d --build
 ```
 
-- 端口绑定 `127.0.0.1:3010`，外部无法直接访问
+- 端口绑定 `127.0.0.1:6533`，外部无法直接访问
 - `./data` 与 `./config.json` 挂载到宿主机：改配置 / 升级不丢数据
 
 ### Nginx（`ops.nnde.de`）
@@ -321,7 +321,7 @@ docker compose up -d --build
 
 ```nginx
 location /survey/ {
-    proxy_pass http://127.0.0.1:3010;
+    proxy_pass http://127.0.0.1:6533;
     proxy_http_version 1.1;
 
     proxy_set_header Host $host;
@@ -357,7 +357,7 @@ nginx -t && systemctl reload nginx
 ## 9. 测试 curl 命令
 
 ```bash
-BASE=http://127.0.0.1:3010
+BASE=http://127.0.0.1:6533
 TOKEN=CHANGE_ME_ADMIN_TOKEN
 
 # 1) 公开信息（不含计数）

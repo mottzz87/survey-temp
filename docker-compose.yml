@@ -7,14 +7,14 @@ services:
     # The port is read from config.json (server.port). If you change it there,
     # update the mapping below to match.
     ports:
-      - "127.0.0.1:3010:3010"
+      - "127.0.0.1:6533:6533"
     volumes:
       # Live votes + config on the host, so you can add surveys / edit config
       # without rebuilding the image (config is re-read on mtime change).
       - ./data:/app/data
       - ./config.json:/app/config.json:ro
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3010/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:6533/health"]
       interval: 30s
       timeout: 5s
       retries: 3
