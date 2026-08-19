@@ -698,6 +698,10 @@ function handleRequest(req, res) {
   const pathname = reqUrl.pathname;
   const segments = pathname.split('/').filter(Boolean);
 
+  if (pathname === '/favicon.ico') {
+    return serveStatic(res, 'favicon.ico');
+  }
+
   if (pathname === '/' || pathname === '') {
     res.writeHead(302, { Location: '/survey/' });
     return res.end();
