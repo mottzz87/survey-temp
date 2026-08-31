@@ -167,6 +167,13 @@ function getAdminConfig(survey) {
   return (survey && survey.admin) || cfg.admin || {};
 }
 
+// The summary page lives at /survey/<id>/<mirror>, where the mirror is the
+// reversed survey id (e.g. 583721 -> 127385). It doubles as a faint access
+// gate on top of admin auth.
+function reverseId(id) {
+  return String(id).split('').reverse().join('');
+}
+
 /* ------------------------------------------------------------------ *
  * Data store (JSON file per survey, atomic write)
  * ------------------------------------------------------------------ */
@@ -449,6 +456,41 @@ function handleMyVote(survey, voterId) {
   };
 }
 
+// Per-voter list for the summary page: nicknames, answers mapped to labels,
+// plus created/updated timestamps for sorting.
+function buildSummaryPayload(survey, data) {
+  const voters = (data && data.voters) || {};
+  const labelByOption = {};
+  for (const q of survey.questions) {
+    labelByOption[q.id] = {};
+    for (const o of q.options) labelByOption[q.id][o.id] = o.label;
+  }
+  const list = Object.entries(voters).map(([voterId, rec]) => {
+    const answers = normalizeAnswers(rec.answers, survey);
+    const answerLabels = {};
+    for (const q of survey.questions) {
+      answerLabels[q.id] = (answers[q.id] || []).map(
+        (id) => (labelByOption[q.id][id] != null ? labelByOption[q.id][id] : id)
+      );
+    }
+    return {
+      voterId,
+      name: rec.name || '',
+      answers: answerLabels,
+      createdAt: rec.createdAt || null,
+      updatedAt: rec.updatedAt || null
+    };
+  });
+  return {
+    ok: true,
+    surveyId: survey.id,
+    title: survey.title,
+    total: list.length,
+    questions: survey.questions.map((q) => ({ id: q.id, title: q.title })),
+    voters: list
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * HTTP helpers
  * ------------------------------------------------------------------ */
@@ -685,6 +727,27 @@ function handleApi(req, res, reqUrl, surveyId, action) {
     return serveStatic(res, 'admin.html');
   }
 
+  if (action === 'summary') {
+    if (req.method !== 'GET') return sendJson(res, 405, { ok: false, error: 'method not allowed' });
+    const wantJson =
+      reqUrl.searchParams.get('format') === 'json' ||
+      /application\/json/.test(req.headers.accept || '');
+    const authorized = isAdminAuthorized(survey, req, reqUrl.searchParams);
+
+    if (!authorized) {
+      // Like the result action, the HTML shell is served so the admin can
+      // enter a token in the browser; data only flows through JSON below.
+      if (wantJson) return sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      return serveStatic(res, 'summary.html');
+    }
+
+    if (wantJson) {
+      const data = readData(survey.id);
+      return sendJson(res, 200, buildSummaryPayload(survey, data));
+    }
+    return serveStatic(res, 'summary.html');
+  }
+
   return sendJson(res, 404, { ok: false, error: 'not found' });
 }
 
@@ -723,6 +786,15 @@ function handleRequest(req, res) {
     const action = segments[3] || '';
     if (!surveyId || !action) return sendJson(res, 404, { ok: false, error: 'not found' });
     return handleApi(req, res, reqUrl, surveyId, action);
+  }
+
+  // /survey/<id>/<mirror>  -> summary page (mirror = reversed survey id)
+  if (segments.length === 3) {
+    const summaryId = segments[1];
+    if (SURVEY_ID_RE.test(summaryId) && segments[2] === reverseId(summaryId) && getSurvey(summaryId)) {
+      return serveStatic(res, 'summary.html');
+    }
+    return sendSurvey404(res);
   }
 
   // /survey/<id>/  -> survey page

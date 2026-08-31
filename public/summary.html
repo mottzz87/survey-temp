@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>汇总 | アンケート</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<style>
+:root {
+  --bg: #f6f8f7;
+  --card: #ffffff;
+  --brand: #2f8f5b;
+  --text: #1f2d26;
+  --muted: #6b7a72;
+  --border: #e2e8e4;
+  --error: #c0392b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  -webkit-text-size-adjust: 100%;
+}
+.container { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+h1 { font-size: 1.25rem; margin: 0 0 10px; line-height: 1.5; }
+.meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pill {
+  padding: 6px 14px;
+  background: #eaf5ee;
+  color: var(--brand);
+  border-radius: 999px;
+  font-weight: 700;
+}
+.back {
+  font-size: .88rem;
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+.back:hover { text-decoration: underline; }
+.table-card { padding: 18px 16px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 620px; }
+th {
+  text-align: left;
+  font-size: .86rem;
+  color: var(--muted);
+  font-weight: 700;
+  background: #f4f6f5;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--brand); }
+th .arrow { color: var(--brand); font-size: .78rem; }
+td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  font-size: .94rem;
+}
+td.nick, th.nick { font-weight: 600; white-space: nowrap; }
+td.time { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; font-size: .88rem; }
+.na { color: #b0bab4; }
+.empty { color: var(--muted); text-align: center; padding: 32px 0; }
+.gate { max-width: 420px; margin: 60px auto 0; text-align: center; }
+.gate input {
+  width: 100%;
+  padding: 13px 14px;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  outline: none;
+}
+.gate input:focus { border-color: var(--brand); }
+.btn {
+  padding: 12px 20px;
+  font-size: .95rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.btn:hover { opacity: .9; }
+.gate .btn { width: 100%; }
+.gate .err { color: var(--error); font-weight: 600; margin-top: 10px; }
+.error-card { max-width: 420px; margin: 60px auto 0; text-align: center; color: var(--muted); }
+.error-card h1 { font-size: 1.1rem; }
+.error-card .btn { display: inline-block; margin-top: 8px; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <main id="app">
+
+    <div class="card gate" id="gate" style="display:none">
+      <h1>🔒 管理者認証</h1>
+      <p style="color:var(--muted);font-size:.92rem">汇总データを表示するには管理者トークンが必要です。</p>
+      <input id="tokenInput" type="password" placeholder="管理者トークン" autocomplete="off">
+      <button class="btn" id="tokenBtn">ログイン</button>
+      <div class="err" id="authError"></div>
+    </div>
+
+    <div class="card error-card" id="error" style="display:none">
+      <h1>⚠️ エラー</h1>
+      <p id="errorMsg"></p>
+    </div>
+
+    <div id="dashboard" style="display:none">
+      <div class="card">
+        <h1 id="title">…</h1>
+        <div class="meta">
+          <span class="pill">提交人数: <b id="total">0</b> 人</span>
+          <a class="back" id="backLink" href="#">← 返回问卷</a>
+        </div>
+      </div>
+
+      <div class="card table-card">
+        <div class="table-wrap">
+          <table id="summaryTable">
+            <thead id="thead"></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="empty" style="display:none">暂无数据</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+"use strict";
+(function () {
+  var pathMatch = location.pathname.match(/\/survey\/([^\/]+)\/([^\/]+)/);
+  var surveyId = pathMatch ? pathMatch[1] : '';
+  var mirror = pathMatch ? pathMatch[2] : '';
+  var LS_TOKEN_KEY = 'survey_admin_token';
+
+  function reverse(s) {
+    return s.split('').reverse().join('');
+  }
+
+  var token = new URLSearchParams(location.search).get('token') || localStorage.getItem(LS_TOKEN_KEY) || '';
+  var state = {
+    data: null,
+    sortKey: 'createdAt',
+    sortDir: 'desc'
+  };
+
+  var gate = document.getElementById('gate');
+  var dashboard = document.getElementById('dashboard');
+  var errorCard = document.getElementById('error');
+  var authError = document.getElementById('authError');
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function showGate(msg) {
+    dashboard.style.display = 'none';
+    errorCard.style.display = 'none';
+    gate.style.display = 'block';
+    authError.textContent = msg || '';
+    if (token) { document.getElementById('tokenInput').value = token; }
+    document.getElementById('tokenInput').focus();
+  }
+
+  function showError(msg) {
+    dashboard.style.display = 'none';
+    gate.style.display = 'none';
+    errorCard.style.display = 'block';
+    document.getElementById('errorMsg').textContent = msg;
+  }
+
+  async function fetchJson(path, authToken) {
+    var headers = { 'Accept': 'application/json' };
+    if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+    var r = await fetch(path, { headers: headers, cache: 'no-store' });
+    var data = null;
+    try { data = await r.json(); } catch (e) { data = null; }
+    return { status: r.status, data: data };
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString('ja-JP');
+  }
+
+  function sortVoters(list) {
+    var key = state.sortKey;
+    var dir = state.sortDir === 'desc' ? -1 : 1;
+    return list.slice().sort(function (a, b) {
+      var ta = a[key] ? new Date(a[key]).getTime() : 0;
+      var tb = b[key] ? new Date(b[key]).getTime() : 0;
+      return (ta - tb) * dir;
+    });
+  }
+
+  function onSortHeader(e) {
+    var key = e.currentTarget.getAttribute('data-key');
+    if (state.sortKey === key) {
+      state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
+    } else {
+      state.sortKey = key;
+      state.sortDir = 'desc';
+    }
+    renderTable();
+  }
+
+  function renderTable() {
+    var data = state.data;
+    var rows = sortVoters(data.voters);
+
+    var theadHtml = '<tr><th class="nick">昵称</th>';
+    data.questions.forEach(function (q) {
+      theadHtml += '<th>' + esc(q.title || '回答') + '</th>';
+    });
+    [['createdAt', '创建时间'], ['updatedAt', '更新时间']].forEach(function (pair) {
+      var key = pair[0];
+      var arrow = state.sortKey === key ? (state.sortDir === 'desc' ? '▼' : '▲') : '';
+      theadHtml += '<th class="sortable" data-key="' + key + '">' + pair[1] + ' <span class="arrow">' + arrow + '</span></th>';
+    });
+    theadHtml += '</tr>';
+    document.getElementById('thead').innerHTML = theadHtml;
+
+    document.querySelectorAll('#summaryTable th.sortable').forEach(function (th) {
+      th.addEventListener('click', onSortHeader);
+    });
+
+    var tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+    var empty = document.getElementById('empty');
+
+    if (rows.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    rows.forEach(function (v) {
+      var name = v.name || '无名氏1234';
+      var td = '<td class="nick">' + esc(name) + '</td>';
+      data.questions.forEach(function (q) {
+        var labels = (v.answers && Array.isArray(v.answers[q.id])) ? v.answers[q.id] : [];
+        td += '<td>' + (labels.length ? esc(labels.join('、')) : '<span class="na">—</span>') + '</td>';
+      });
+      td += '<td class="time">' + fmtTime(v.createdAt) + '</td>';
+      td += '<td class="time">' + fmtTime(v.updatedAt) + '</td>';
+      var tr = document.createElement('tr');
+      tr.innerHTML = td;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function load() {
+    var path = '/survey/api/' + encodeURIComponent(surveyId) + '/summary?format=json';
+    var res = await fetchJson(path, token);
+
+    if (res.status === 401) {
+      showGate(res.data && res.data.error === 'unauthorized' ? 'トークンが正しくありません。' : '管理者トークンが必要です。');
+      return;
+    }
+    if (res.status !== 200 || !res.data || !res.data.ok) {
+      showError('データの読み込みに失敗しました（' + res.status + '）。');
+      return;
+    }
+    if (token) localStorage.setItem(LS_TOKEN_KEY, token);
+    state.data = res.data;
+    gate.style.display = 'none';
+    dashboard.style.display = 'block';
+    document.title = res.data.title + ' | 汇总';
+    document.getElementById('title').textContent = res.data.title;
+    document.getElementById('total').textContent = res.data.total;
+    document.getElementById('backLink').href = '/survey/' + encodeURIComponent(surveyId) + '/';
+    renderTable();
+  }
+
+  document.getElementById('tokenBtn').addEventListener('click', function () {
+    token = document.getElementById('tokenInput').value.trim();
+    if (!token) { authError.textContent = 'トークンを入力してください。'; return; }
+    localStorage.setItem(LS_TOKEN_KEY, token);
+    authError.textContent = '';
+    load();
+  });
+  document.getElementById('tokenInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('tokenBtn').click();
+  });
+
+  if (!surveyId || !mirror || mirror !== reverse(surveyId)) {
+    showError('URLが正しくありません。');
+  } else {
+    load();
+  }
+})();
+</script>
+</body>
+</html>
