@@ -347,6 +347,31 @@ function isAdminAuthorized(survey, req, searchParams) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Shared auth endpoint for Nginx auth_request
+ * ------------------------------------------------------------------ */
+
+function handleAuthVerify(req, res) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return sendJson(res, 405, { ok: false, error: 'method not allowed' });
+  }
+
+  const cfg = loadConfig();
+  const admin = cfg.admin || {};
+
+  if (!admin.enabled || !admin.token) {
+    return sendJson(res, 403, { ok: false, error: 'auth disabled' });
+  }
+
+  const provided = extractBearer(req);
+
+  if (!provided || !safeEqual(provided, admin.token)) {
+    return sendJson(res, 401, { ok: false, error: 'unauthorized' });
+  }
+
+  return sendJson(res, 200, { ok: true });
+}
+
+/* ------------------------------------------------------------------ *
  * Simple per-IP rate limiting (in-memory, vote endpoint only)
  * ------------------------------------------------------------------ */
 
@@ -773,6 +798,11 @@ function handleRequest(req, res) {
   // Health check (used by docker healthcheck)
   if (pathname === '/health' || pathname === '/healthz') {
     return sendJson(res, 200, { ok: true });
+  }
+
+  // Internal auth endpoint for Nginx auth_request
+  if (pathname === '/auth/verify') {
+      return handleAuthVerify(req, res);
   }
 
   if (segments[0] !== 'survey') return sendHtml(res, 404, '<!doctype html><meta charset="utf-8"><title>404</title><h1>404 Not Found</h1>');
